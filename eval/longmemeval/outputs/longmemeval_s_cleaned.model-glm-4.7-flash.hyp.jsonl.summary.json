@@ -1,0 +1,34 @@
+{
+  "judge_note": "NON-OFFICIAL judge: GLM-4.7-Flash via OpenAI-compatible endpoint. Scores are NOT directly comparable to the official GPT-4o evaluation in the LongMemEval paper.",
+  "total": 500,
+  "overall_accuracy": 0.0,
+  "task_averaged_accuracy": 0.0,
+  "per_type": {
+    "knowledge-update": {
+      "accuracy": 0.0,
+      "n": 78
+    },
+    "multi-session": {
+      "accuracy": 0.0,
+      "n": 133
+    },
+    "single-session-assistant": {
+      "accuracy": 0.0,
+      "n": 56
+    },
+    "single-session-preference": {
+      "accuracy": 0.0,
+      "n": 30
+    },
+    "single-session-user": {
+      "accuracy": 0.0,
+      "n": 70
+    },
+    "temporal-reasoning": {
+      "accuracy": 0.0,
+      "n": 133
+    }
+  },
+  "abstention_accuracy": 0.0,
+  "abstention_n": 30
+}

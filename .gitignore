@@ -1,0 +1,45 @@
+# === Secrets (never commit) ===
+.env
+.env.local
+.env.*.local
+*.pem
+*.key
+
+# === Python runtime ===
+__pycache__/
+*.py[cod]
+*.pyo
+.venv/
+venv/
+env/
+*.egg-info/
+dist/
+build/
+
+# === Test / pytest caches & temp dirs ===
+.pytest_cache/
+.pytest_*/
+.tmp_*/
+*tmp_pytest/
+ProjectCatTogetherbackend.tmp_pytest
+.pytest_codex_v21_all/
+.pytest_codex_v21_all_2/
+.pytest_codex_v21_final/
+.pytest_tmp/
+
+# === Runtime data (memory.db, qdrant, sessions, feishu bindings, users, projects) ===
+data/
+*.db
+*.db-shm
+*.db-wal
+backend_start.log
+
+# === Windows reserved-name artifact ===
+nul
+
+# === OS / editor ===
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+*.swp

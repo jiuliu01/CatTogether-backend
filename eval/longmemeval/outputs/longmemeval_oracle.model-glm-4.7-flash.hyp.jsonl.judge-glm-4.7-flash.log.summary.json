@@ -1,0 +1,14 @@
+{
+  "judge_note": "NON-OFFICIAL judge: GLM-4.7-Flash via OpenAI-compatible endpoint. Scores are NOT directly comparable to the official GPT-4o evaluation in the LongMemEval paper.",
+  "total": 10,
+  "overall_accuracy": 1.0,
+  "task_averaged_accuracy": 1.0,
+  "per_type": {
+    "temporal-reasoning": {
+      "accuracy": 1.0,
+      "n": 10
+    }
+  },
+  "abstention_accuracy": 0.0,
+  "abstention_n": 0
+}

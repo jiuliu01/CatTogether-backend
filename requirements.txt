@@ -1,0 +1,12 @@
+fastapi>=0.110
+uvicorn[standard]>=0.29
+pydantic>=2.6
+httpx>=0.27
+lark-oapi>=1.4.12
+mcp>=1.0
+sqlite-vec>=0.1.6
+
+# Optional: local embedding model (bge-small-zh-v1.5, 512-dim).
+# Install with: pip install -r requirements-embedding.txt
+# Or: pip install sentence-transformers
+# sentence-transformers>=2.7  # uncomment to enable local embeddings

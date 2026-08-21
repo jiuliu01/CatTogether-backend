@@ -50,9 +50,12 @@ def get_memory_store() -> Optional[MemoryStore]:
         client = QdrantClient(
             url=settings.qdrant_url,
             api_key=settings.qdrant_api_key,
+            timeout=30,
         )
         # Probe the connection once so a misconfigured URL fails fast here
-        # rather than on every agent invocation.
+        # rather than on every agent invocation. Use a bounded timeout so a
+        # transient Qdrant stall (GC pause, disk flush) doesn't permanently
+        # mark the store as failed for the whole process.
         client.get_collections()
         dense = get_embedder()
         sparse = None
@@ -73,8 +76,10 @@ def get_memory_store() -> Optional[MemoryStore]:
                     settings.qdrant_url, settings.qdrant_collection)
         return _store
     except Exception:
-        logger.exception("Memory 2.2 store init failed; v22 disabled for this process")
-        _init_failed = True
+        # Transient failures (timeout, connection reset) must NOT permanently
+        # disable the store — return None for this call but let the next call
+        # retry. Only hard config errors (bad URL/embedder) naturally persist.
+        logger.warning("Memory 2.2 store init failed this attempt (will retry next call): %s", exc_info=True)
         return None
 
 

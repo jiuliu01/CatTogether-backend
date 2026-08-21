@@ -266,6 +266,15 @@ class Settings:
     memory22_top_k: int = field(default_factory=lambda: int(os.environ.get("CT_MEMORY22_TOP_K", "8")))
     memory22_rrf_weight_vector: float = field(default_factory=lambda: float(os.environ.get("CT_MEMORY22_RRF_WEIGHT_VECTOR", "0.5")))
     memory22_rrf_weight_bm25: float = field(default_factory=lambda: float(os.environ.get("CT_MEMORY22_RRF_WEIGHT_BM25", "0.5")))
+
+    # Memory agent execution backend (api = direct httpx to OpenAI-compat endpoint;
+    # cli = legacy Claude Code CLI subprocess, kept as fallback).
+    memory_agent_backend: str = field(default_factory=lambda: os.environ.get("CT_MEMORY_AGENT_BACKEND", "api"))
+    memory_agent_model: str = field(default_factory=lambda: os.environ.get("CT_MEMORY_AGENT_MODEL", "glm-5.2"))
+    memory_agent_base_url: str = field(default_factory=lambda: os.environ.get("CT_MEMORY_AGENT_BASE_URL", "http://10.0.0.10:13001/v1"))
+    memory_agent_api_key: str | None = field(default_factory=lambda: os.environ.get("CT_MEMORY_AGENT_API_KEY") or os.environ.get("OPENAI_API_KEY"))
+    memory_agent_max_tokens: int = field(default_factory=lambda: int(os.environ.get("CT_MEMORY_AGENT_MAX_TOKENS", "4096")))
+    memory_agent_temperature: float = field(default_factory=lambda: float(os.environ.get("CT_MEMORY_AGENT_TEMPERATURE", "0.0")))
     feishu_progress_update_interval: float = field(
         default_factory=lambda: float(os.environ.get("CT_FEISHU_PROGRESS_UPDATE_INTERVAL", "3"))
     )

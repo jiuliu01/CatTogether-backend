@@ -56,6 +56,14 @@ class CLIBaseAgent(BaseAgent):
             env.setdefault("OPENAI_API_KEY", settings.openai_api_key)
         if settings.anthropic_api_key:
             env.setdefault("ANTHROPIC_API_KEY", settings.anthropic_api_key)
+        # Some Anthropic-compatible proxies (and Claude Code itself) auth via
+        # ANTHROPIC_AUTH_TOKEN + ANTHROPIC_BASE_URL rather than ANTHROPIC_API_KEY.
+        # Propagate both so the child CLI can reach the same endpoint the host
+        # is configured against. ``setdefault`` keeps any explicit child value.
+        for var in ("ANTHROPIC_AUTH_TOKEN", "ANTHROPIC_BASE_URL"):
+            val = os.environ.get(var)
+            if val:
+                env.setdefault(var, val)
         return env
 
     # subclass hooks

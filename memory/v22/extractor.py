@@ -299,6 +299,7 @@ class MemoryExtractor:
         self._db = db or memory_db
         self._recent_turns = recent_turns
         self._related_top_k = related_top_k
+        self._last_usage: dict | None = None  # set by extract() for token accounting
 
     async def extract(self, ctx: ExtractionContext) -> ExtractionResult:
         result = ExtractionResult()
@@ -343,7 +344,11 @@ class MemoryExtractor:
             related_block = _format_related_memories(related)
 
             # 3. Invoke the memory agent.
-            raw_output = await self._invoke_memory_agent(ctx, recent_text, related_block)
+            raw_output, usage = await self._invoke_memory_agent(ctx, recent_text, related_block)
+            # Surface the latest usage for callers that track token costs (run_e2e).
+            # Not stored on ExtractionResult per the eval design — the caller reads
+            # this attribute right after extract() returns.
+            self._last_usage = usage
             if raw_output is None:
                 result.failed = "memory_agent_invocation_failed"
                 return result
@@ -411,12 +416,16 @@ class MemoryExtractor:
         ctx: ExtractionContext,
         recent_text: str,
         related_block: str,
-    ) -> str | None:
+    ) -> tuple[str | None, dict | None]:
         """Run the memory agent and collect its full final output as one string.
 
-        The agent is a ClaudeCodeAgent (Claude CLI subprocess) driven by its
-        spec. We feed the assembled prompt via InvokeContext and consume the
-        ``final_text`` event; any narration before it is discarded.
+        The agent is driven by its spec (ApiMemoryAgent for the API backend, or
+        ClaudeCodeAgent for the legacy CLI backend). We feed the assembled prompt
+        via InvokeContext and consume the ``final_text`` event; any narration
+        before it is discarded. The ``done`` event (emitted by ApiMemoryAgent)
+        carries a ``usage`` block for token accounting — we return it alongside
+        the text so the caller can accumulate token usage without storing it on
+        ExtractionResult (per the eval design, token stats live in run_e2e).
         """
         from agents.base import InvokeContext
 
@@ -436,6 +445,7 @@ class MemoryExtractor:
             timeout=getattr(getattr(self._agent, "_spec", None), "timeout", 120),
         )
         final_text: str | None = None
+        usage: dict | None = None
         parts: list[str] = []
         try:
             async for etype, data in self._agent.invoke(agent_ctx):
@@ -445,10 +455,13 @@ class MemoryExtractor:
                     # Some flows never emit final_text; accumulate narration as
                     # a fallback so a JSON buried in deltas is still parseable.
                     parts.append(str(data.get("delta") or ""))
+                elif etype == "done":
+                    # ApiMemoryAgent surfaces token usage here (CLI backend has none).
+                    usage = data.get("usage") or None
                 elif etype == "error":
                     logger.warning("memory agent error: %s", data.get("message", ""))
-                    return None
+                    return None, None
         except Exception:
             logger.exception("memory agent invocation raised")
-            return None
-        return final_text or "".join(parts).strip() or None
+            return None, None
+        return final_text or "".join(parts).strip() or None, usage

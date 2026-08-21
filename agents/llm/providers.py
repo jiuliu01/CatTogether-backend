@@ -49,6 +49,63 @@ async def stream_openai(
                     yield delta
 
 
+async def stream_openai_with_usage(
+    messages: list[dict],
+    model: str,
+    system: str | None = None,
+    temperature: float = 0.7,
+) -> AsyncIterator[tuple[str, dict | None]]:
+    """Streaming OpenAI-compatible call that also surfaces token usage.
+
+    Same as ``stream_openai`` but requests ``stream_options.include_usage`` so
+    the final SSE chunk carries a ``usage`` block. Yields ``(delta, usage)``
+    pairs; ``usage`` is ``None`` for every chunk except the last (which may be
+    an empty dict if the endpoint doesn't support include_usage). Callers that
+    only want text can ignore the second element.
+    """
+    api_key = settings.openai_api_key
+    if not api_key:
+        yield "", None
+        return
+    payload_messages: list[dict] = []
+    if system:
+        payload_messages.append({"role": "system", "content": system})
+    payload_messages.extend(messages)
+    payload = {
+        "model": model,
+        "messages": payload_messages,
+        "temperature": temperature,
+        "stream": True,
+        "stream_options": {"include_usage": True},
+    }
+    headers = {"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"}
+    url = f"{settings.openai_base_url.rstrip('/')}/chat/completions"
+    async with httpx.AsyncClient(timeout=httpx.Timeout(120.0, connect=10.0)) as client:
+        async with client.stream("POST", url, json=payload, headers=headers) as resp:
+            resp.raise_for_status()
+            async for line in resp.aiter_lines():
+                if not line or not line.startswith("data:"):
+                    continue
+                data = line[len("data:"):].strip()
+                if data == "[DONE]":
+                    break
+                try:
+                    obj = json.loads(data)
+                except Exception:
+                    continue
+                delta = ""
+                try:
+                    delta = obj["choices"][0]["delta"].get("content") or ""
+                except (KeyError, IndexError):
+                    # The final usage-only chunk has an empty choices array.
+                    pass
+                usage = obj.get("usage")
+                if delta:
+                    yield delta, None
+                if usage:
+                    yield "", usage
+
+
 async def stream_anthropic(
     messages: list[dict],
     model: str,

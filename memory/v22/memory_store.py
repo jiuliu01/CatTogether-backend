@@ -99,6 +99,59 @@ class MemoryStore:
         self._collection = collection_name
         self._vector_size = vector_size
         self._ready = False
+        # Token accounting for the embedding side (#4 write + #5 read). The
+        # embedder is a local BGE model (no API tokens), so these are
+        # *equivalent* token counts — the number of tokens the embedder
+        # processed, measured two ways: with the BGE model's own tokenizer
+        # (most faithful to what the embedder actually saw) and with a uniform
+        # tokenizer (cl100k_base, for cross-model comparison). Callers (run_e2e)
+        # read these after a question and reset them.
+        self.token_stats: dict[str, int] = {
+            "bge_write": 0, "bge_read": 0,
+            "uniform_write": 0, "uniform_read": 0,
+        }
+        self._bge_tokenizer = None      # lazy: dense_embedder's underlying tokenizer
+        self._uniform_tokenizer = None   # lazy: tiktoken cl100k_base or char fallback
+
+    # ------------------------------------------------------------------
+    # token accounting helpers
+    # ------------------------------------------------------------------
+    def _bge_token_count(self, text: str) -> int:
+        """Token count via the BGE model's own tokenizer (most faithful)."""
+        if self._bge_tokenizer is None:
+            tok = None
+            model = getattr(self._dense, "_model", None)
+            if model is not None:
+                tok = getattr(model, "tokenizer", None)
+            self._bge_tokenizer = tok
+        if self._bge_tokenizer is None:
+            return len(text)  # fallback: char count
+        try:
+            ids = self._bge_tokenizer.encode(text)
+            return len(ids)
+        except Exception:
+            return len(text)
+
+    def _uniform_token_count(self, text: str) -> int:
+        """Token count via a uniform tokenizer (cl100k_base) for cross-model
+        comparison. Falls back to char count if tiktoken is unavailable."""
+        if self._uniform_tokenizer is None:
+            try:
+                import tiktoken
+                self._uniform_tokenizer = tiktoken.get_encoding("cl100k_base")
+            except Exception:
+                self._uniform_tokenizer = False  # sentinel: unavailable
+        if self._uniform_tokenizer is False:
+            return len(text)
+        try:
+            return len(self._uniform_tokenizer.encode(text))
+        except Exception:
+            return len(text)
+
+    def reset_token_stats(self) -> None:
+        """Clear accumulated embedding token stats (call between questions)."""
+        for k in self.token_stats:
+            self.token_stats[k] = 0
 
     # ------------------------------------------------------------------
     # collection setup
@@ -131,6 +184,10 @@ class MemoryStore:
     def upsert(self, memory: Memory) -> Memory:
         """Write one Memory as a Qdrant Point carrying dense + bm25 vectors."""
         self.ensure_collection()
+        # Account embedding tokens (write side, #4): the embedder processes
+        # memory.text for both the dense and sparse paths.
+        self.token_stats["bge_write"] += self._bge_token_count(memory.text)
+        self.token_stats["uniform_write"] += self._uniform_token_count(memory.text)
         dense_vec = self._dense.embed(memory.text)
         if len(dense_vec) != self._vector_size:
             raise ValueError(
@@ -199,6 +256,9 @@ class MemoryStore:
         # --- dense vector KNN ---
         if weight_vector > 0:
             try:
+                # Account embedding tokens (read side, #5): query embedding.
+                self.token_stats["bge_read"] += self._bge_token_count(query)
+                self.token_stats["uniform_read"] += self._uniform_token_count(query)
                 qv = self._dense.embed(query)
                 if len(qv) == self._vector_size:
                     res = self._client.query_points(

@@ -1,0 +1,10 @@
+# eval data (280MB datasets, downloaded via download_data.py)
+longmemeval/data/
+# eval outputs (regenerable)
+longmemeval/outputs/
+memory_agent/outputs/
+# smoke/temp scripts
+*.sh
+# caches
+__pycache__/
+*.pyc
